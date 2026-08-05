@@ -112,3 +112,45 @@ run_deg_analysis <- function(gse_id,
     deg_table = deg_table
   )
 }
+
+#-------------------------------------------------------------------------
+# 2. PATHWAY ENRICHMENT FUNCTION
+#
+# Takes the DEG table from run_deg_analysis() and asks: which biological
+# processes (GO) and pathways (KEGG) are over-represented among the
+# significant genes?
+#-------------------------------------------------------------------------
+
+run_enrichment <- function(deg_table, pvalue_cutoff = 0.05) {
+  
+  gene_symbols <- unique(na.omit(deg_table$SYMBOL))
+  gene_symbols <- gene_symbols[gene_symbols != ""]
+  
+  if (length(gene_symbols) < 5) {
+    warning("Fewer than 5 annotated gene symbols in DEG list; ",
+            "enrichment results may be unreliable or empty.")
+  }
+  
+  id_map <- bitr(
+    gene_symbols, fromType = "SYMBOL", toType = "ENTREZID",
+    OrgDb = org.Hs.eg.db
+  )
+  
+  go_result <- enrichGO(
+    gene = id_map$ENTREZID,
+    OrgDb = org.Hs.eg.db,
+    keyType = "ENTREZID",
+    ont = "BP",
+    pAdjustMethod = "fdr",
+    pvalueCutoff = pvalue_cutoff,
+    readable = TRUE
+  )
+  
+  kegg_result <- enrichKEGG(
+    gene = id_map$ENTREZID,
+    organism = "hsa",
+    pvalueCutoff = pvalue_cutoff
+  )
+  
+  list(go = go_result, kegg = kegg_result, id_map = id_map)
+}

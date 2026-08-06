@@ -42,10 +42,17 @@ run_deg_analysis <- function(gse_id,
                              contrast_groups = NULL,
                              keytype = "PROBEID",
                              p_cutoff = 0.05,
-                             dataset_label = gse_id) {
+                             dataset_label = gse_id,
+                             local_file = NULL) {
   
-  message("[", dataset_label, "] Downloading ", gse_id, " from GEO...")
-  gset <- getGEO(gse_id, GSEMatrix = TRUE, AnnotGPL = TRUE)[[1]]
+  if (!is.null(local_file)) {
+    message("[", dataset_label, "] Loading ", gse_id,
+            " from local file (GEO server download was unreliable): ", local_file)
+    gset <- getGEO(filename = local_file, getGPL = FALSE)
+  } else {
+    message("[", dataset_label, "] Downloading ", gse_id, " from GEO...")
+    gset <- getGEO(gse_id, GSEMatrix = TRUE, AnnotGPL = TRUE)[[1]]
+  }
   ex <- exprs(gset)
   
   qx <- as.numeric(quantile(ex, c(0, 0.25, 0.5, 0.75, 0.99, 1), na.rm = TRUE))
@@ -90,9 +97,6 @@ run_deg_analysis <- function(gse_id,
     columns = c("SYMBOL", "GENENAME"), keytype = keytype
   )
   
-  deg_table$PROBEID <- rownames(deg_table)
-  deg_table <- merge(deg_table, gene_annotation,
-                     by.x = "PROBEID", by.y = keytype, all.x = TRUE)
   deg_table$PROBEID <- rownames(deg_table)
   deg_table <- merge(deg_table, gene_annotation,
                      by.x = "PROBEID", by.y = keytype, all.x = TRUE)
@@ -153,4 +157,45 @@ run_enrichment <- function(deg_table, pvalue_cutoff = 0.05) {
   )
   
   list(go = go_result, kegg = kegg_result, id_map = id_map)
+}
+
+#-------------------------------------------------------------------------
+#LUNG ADENOCARCINOMA DATASET (GSE10072)
+#
+# source_name_ch1 metadata contains two labels: "Adenocarcinoma of the Lung"
+# and "Normal Lung Tissue" (confirmed by inspecting the GEO series matrix
+# directly). After make.names() conversion these become
+# "Adenocarcinoma.of.the.Lung" and "Normal.Lung.Tissue". Contrast is set
+# explicitly (tumor vs normal) so positive logFC means higher expression
+# in tumor tissue, rather than relying on factor level order.
+
+# NOTE: GEO's automatic download for this series was unreliable (repeated
+# connection failures), so this run uses a manually downloaded local copy
+# of the series matrix via the local_file argument, with getGPL = FALSE
+# (platform annotation is not needed since hgu133a.db supplies gene
+# symbols downstream).
+#-------------------------------------------------------------------------
+
+lung_result <- run_deg_analysis(
+  gse_id            = "GSE10072",
+  group_meta_column = "source_name_ch1",
+  annotation_db     = hgu133a.db,
+  contrast_groups   = c("Adenocarcinoma.of.the.Lung", "Normal.Lung.Tissue"),
+  p_cutoff          = 0.01,
+  dataset_label     = "Lung adenocarcinoma (GSE10072)",
+  local_file        = "DATASET_GSE10072.txt"
+)
+
+head(lung_result$deg_table[, c("PROBEID", "SYMBOL", "logFC", "adj.P.Val")])
+
+lung_enrichment <- run_enrichment(lung_result$deg_table, pvalue_cutoff = 0.05)
+
+if (!is.null(lung_enrichment$go) && nrow(lung_enrichment$go@result) > 0) {
+  dotplot(lung_enrichment$go, showCategory = 15) +
+    ggtitle("GO Biological Process Enrichment: Lung Adenocarcinoma (GSE10072)")
+}
+
+if (!is.null(lung_enrichment$kegg) && nrow(lung_enrichment$kegg@result) > 0) {
+  dotplot(lung_enrichment$kegg, showCategory = 15) +
+    ggtitle("KEGG Pathway Enrichment: Lung Adenocarcinoma (GSE10072)")
 }

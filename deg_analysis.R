@@ -126,6 +126,14 @@ volcano_data$direction <- "Not significant"
 volcano_data$direction[volcano_data$adj.P.Val < 0.01 & volcano_data$logFC > 1] <- "Up in tumor"
 volcano_data$direction[volcano_data$adj.P.Val < 0.01 & volcano_data$logFC < -1] <- "Down in tumor"
 
+top_up <- volcano_data[volcano_data$direction == "Up in tumor", ]
+top_up <- top_up[order(top_up$adj.P.Val), ][1:8, ]
+
+top_down <- volcano_data[volcano_data$direction == "Down in tumor", ]
+top_down <- top_down[order(top_down$adj.P.Val), ][1:8, ]
+
+top_labels <- rbind(top_up, top_down)
+
 ggplot(volcano_data, aes(x = logFC, y = -log10(adj.P.Val), color = direction)) +
   geom_point(alpha = 0.6, size = 1) +
   scale_color_manual(values = c("Up in tumor" = "firebrick",
@@ -133,6 +141,8 @@ ggplot(volcano_data, aes(x = logFC, y = -log10(adj.P.Val), color = direction)) +
                                 "Not significant" = "grey70")) +
   geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "grey40") +
   geom_hline(yintercept = -log10(0.01), linetype = "dashed", color = "grey40") +
+  geom_text_repel(data = top_labels, aes(label = SYMBOL),
+                  size = 3, color = "black", max.overlaps = 20) +
   labs(title = "Volcano Plot: Lung Adenocarcinoma vs Normal (GSE10072)",
        x = "log2 Fold Change", y = "-log10(adj.P.Val)", color = NULL) +
   theme_minimal()

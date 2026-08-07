@@ -118,6 +118,46 @@ run_deg_analysis <- function(gse_id,
 }
 
 #-------------------------------------------------------------------------
+# Volcano plot: logFC vs. significance, highlighting up/down regulated genes
+#-------------------------------------------------------------------------
+
+volcano_data <- lung_result$deg_table
+volcano_data$direction <- "Not significant"
+volcano_data$direction[volcano_data$adj.P.Val < 0.01 & volcano_data$logFC > 1] <- "Up in tumor"
+volcano_data$direction[volcano_data$adj.P.Val < 0.01 & volcano_data$logFC < -1] <- "Down in tumor"
+
+ggplot(volcano_data, aes(x = logFC, y = -log10(adj.P.Val), color = direction)) +
+  geom_point(alpha = 0.6, size = 1) +
+  scale_color_manual(values = c("Up in tumor" = "firebrick",
+                                "Down in tumor" = "steelblue",
+                                "Not significant" = "grey70")) +
+  geom_vline(xintercept = c(-1, 1), linetype = "dashed", color = "grey40") +
+  geom_hline(yintercept = -log10(0.01), linetype = "dashed", color = "grey40") +
+  labs(title = "Volcano Plot: Lung Adenocarcinoma vs Normal (GSE10072)",
+       x = "log2 Fold Change", y = "-log10(adj.P.Val)", color = NULL) +
+  theme_minimal()
+
+#-------------------------------------------------------------------------
+# Heatmap: top 30 most significant genes across all samples
+#-------------------------------------------------------------------------
+
+top_genes <- lung_result$deg_table[1:30, ]
+heatmap_matrix <- lung_result$ex[top_genes$PROBEID, ]
+rownames(heatmap_matrix) <- ifelse(is.na(top_genes$SYMBOL) | top_genes$SYMBOL == "",
+                                   top_genes$PROBEID, top_genes$SYMBOL)
+
+sample_groups <- data.frame(
+  Group = lung_result$gset$group,
+  row.names = colnames(heatmap_matrix)
+)
+
+pheatmap(heatmap_matrix,
+         scale = "row",
+         annotation_col = sample_groups,
+         show_colnames = FALSE,
+         main = "Top 30 DE Genes: Lung Adenocarcinoma vs Normal (GSE10072)")
+
+#-------------------------------------------------------------------------
 # 2. PATHWAY ENRICHMENT FUNCTION
 #
 # Takes the DEG table from run_deg_analysis() and asks: which biological
